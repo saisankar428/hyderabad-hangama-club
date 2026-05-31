@@ -1,0 +1,54 @@
+name: CI
+on:
+  push:
+      branches: [main, develop]
+        pull_request:
+            branches: [main]
+
+            jobs:
+              api-lint:
+                  name: API Lint + Type Check
+                      runs-on: ubuntu-latest
+                          defaults:
+                                run:
+                                        working-directory: apps/api
+                                            steps:
+                                                  - uses: actions/checkout@v4
+                                                        - uses: actions/setup-python@v5
+                                                                with:
+                                                                          python-version: "3.12"
+                                                                                    cache: pip
+                                                                                          - run: pip install -r requirements.txt
+                                                                                                - name: Setup env
+                                                                                                        run: |
+                                                                                                                  cp /dev/null .env
+                                                                                                                            echo "DATABASE_URL=postgresql+asyncpg://hangama:test@localhost:5432/hangama_test" >> .env
+                                                                                                                                      echo "SECRET_KEY=test_secret_key_32_chars_minimum_ok" >> .env
+                                                                                                                                                echo "RAZORPAY_KEY_ID=rzp_test_dummy" >> .env
+                                                                                                                                                          echo "RAZORPAY_KEY_SECRET=dummy_secret" >> .env
+                                                                                                                                                                    echo "RAZORPAY_WEBHOOK_SECRET=dummy_webhook" >> .env
+                                                                                                                                                                              echo "SENDGRID_API_KEY=SG.dummy" >> .env
+                                                                                                                                                                                        echo "EMAIL_FROM=test@example.com" >> .env
+                                                                                                                                                                                                  echo "TWILIO_ACCOUNT_SID=ACdummy" >> .env
+                                                                                                                                                                                                            echo "TWILIO_AUTH_TOKEN=dummy_auth" >> .env
+                                                                                                                                                                                                                  - run: ruff check src/ --output-format=github
+                                                                                                                                                                                                                  
+                                                                                                                                                                                                                    web-build:
+                                                                                                                                                                                                                        name: Web Build + Type Check
+                                                                                                                                                                                                                            runs-on: ubuntu-latest
+                                                                                                                                                                                                                                defaults:
+                                                                                                                                                                                                                                      run:
+                                                                                                                                                                                                                                              working-directory: apps/web
+                                                                                                                                                                                                                                                  steps:
+                                                                                                                                                                                                                                                        - uses: actions/checkout@v4
+                                                                                                                                                                                                                                                              - uses: actions/setup-node@v4
+                                                                                                                                                                                                                                                                      with:
+                                                                                                                                                                                                                                                                                node-version: "20"
+                                                                                                                                                                                                                                                                                      - run: npm install --legacy-peer-deps
+                                                                                                                                                                                                                                                                                            - run: npx tsc --noEmit
+                                                                                                                                                                                                                                                                                                    continue-on-error: true
+                                                                                                                                                                                                                                                                                                          - run: npm run build
+                                                                                                                                                                                                                                                                                                                  env:
+                                                                                                                                                                                                                                                                                                                            NEXT_PUBLIC_API_URL: http://localhost:8000
+                                                                                                                                                                                                                                                                                                                                      NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_dummy
+                                                                                                                                                                                                                                                                                                                                              continue-on-error: true

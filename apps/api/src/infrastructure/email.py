@@ -106,9 +106,15 @@ _HTML_TEMPLATE = """\
                   </td>
                 </tr>
                 <tr>
-                  <td style="background:#ffffff;padding:16px 20px;">
+                  <td style="background:#f9fafb;padding:16px 20px;border-bottom:1px solid #e5e7eb;">
                     <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;">TICKETS</p>
                     <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#111827;">{quantity}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="background:#ffffff;padding:16px 20px;">
+                    <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;">MOBILE</p>
+                    <p style="margin:4px 0 0 0;font-size:15px;font-weight:600;color:#111827;">{phone}</p>
                   </td>
                 </tr>
               </table>
@@ -186,6 +192,115 @@ async def _send_with_retry(send_fn, ticket_code: str) -> None:
     raise last_exc  # type: ignore[misc]
 
 
+_ADMIN_ALERT_TEMPLATE = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Payment Submitted</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f4f8;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f8;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table width="560" cellpadding="0" cellspacing="0"
+             style="max-width:560px;width:100%;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#d97706 0%,#7c3aed 100%);padding:32px;text-align:center;">
+            <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.75);">
+              HYDERABAD HANGAMA CLUB — ADMIN ALERT
+            </p>
+            <h1 style="margin:0;font-size:22px;font-weight:800;color:#fff;">
+              New Payment Submitted
+            </h1>
+          </td>
+        </tr>
+        <!-- Details -->
+        <tr>
+          <td style="padding:32px 40px;">
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;">
+              A customer has submitted payment proof. Please review and approve or reject from the admin dashboard.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0"
+                   style="border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;">
+              <tr style="background:#f9fafb;">
+                <td style="padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;border-bottom:1px solid #e5e7eb;width:40%;">Name</td>
+                <td style="padding:12px 16px;font-size:15px;font-weight:600;color:#111827;border-bottom:1px solid #e5e7eb;">{attendee_name}</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;border-bottom:1px solid #e5e7eb;">Mobile</td>
+                <td style="padding:12px 16px;font-size:15px;font-weight:600;color:#111827;border-bottom:1px solid #e5e7eb;">{attendee_phone}</td>
+              </tr>
+              <tr style="background:#f9fafb;">
+                <td style="padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;border-bottom:1px solid #e5e7eb;">Amount</td>
+                <td style="padding:12px 16px;font-size:15px;font-weight:700;color:#d97706;border-bottom:1px solid #e5e7eb;">&#8377;{amount_rupees}</td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#9ca3af;">Transaction ID</td>
+                <td style="padding:12px 16px;font-size:14px;font-family:monospace;font-weight:700;color:#4f46e5;">{utr_reference}</td>
+              </tr>
+            </table>
+            {dashboard_section}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 40px 32px;text-align:center;border-top:1px solid #f3f4f6;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">
+              &copy; 2026 Hyderabad Hangama Club. This is an automated admin notification.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
+"""
+
+_DASHBOARD_BUTTON = """\
+<div style="margin-top:24px;text-align:center;">
+  <a href="{url}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#d97706,#7c3aed);color:#fff;font-weight:700;font-size:14px;letter-spacing:0.08em;text-transform:uppercase;border-radius:8px;text-decoration:none;">
+    View Admin Dashboard
+  </a>
+</div>
+"""
+
+
+async def send_admin_payment_notification_email(
+    admin_email: str,
+    attendee_name: str,
+    attendee_phone: str,
+    amount_rupees: str,
+    utr_reference: str,
+    dashboard_url: str = "",
+) -> None:
+    """Send an email alert to the admin when a customer submits payment proof."""
+    resend.api_key = settings.RESEND_API_KEY
+
+    dashboard_section = _DASHBOARD_BUTTON.format(url=dashboard_url) if dashboard_url else ""
+
+    html_body = _ADMIN_ALERT_TEMPLATE.format(
+        attendee_name=attendee_name,
+        attendee_phone=attendee_phone,
+        amount_rupees=amount_rupees,
+        utr_reference=utr_reference,
+        dashboard_section=dashboard_section,
+    )
+
+    params: resend.Emails.SendParams = {
+        "from": f"{settings.EMAIL_FROM_NAME} <{settings.EMAIL_FROM}>",
+        "to": [admin_email],
+        "subject": f"[Action Required] New Payment: {attendee_name} — ₹{amount_rupees}",
+        "html": html_body,
+    }
+
+    send_fn = partial(resend.Emails.send, params)
+    await _send_with_retry(send_fn, f"admin-alert-{utr_reference}")
+
+    logger.info("Admin alert email sent to %s for UTR %s", admin_email, utr_reference)
+
+
 async def send_ticket_email(
     to_email: str,
     to_name: str,
@@ -196,6 +311,7 @@ async def send_ticket_email(
     event_date: str = "",
     event_venue: str = "",
     quantity: int = 1,
+    phone: str = "",
 ) -> None:
     resend.api_key = settings.RESEND_API_KEY
 
@@ -208,6 +324,7 @@ async def send_ticket_email(
         event_date=event_date or "See your ticket PDF for details",
         event_venue=event_venue or "See your ticket PDF for details",
         quantity=quantity,
+        phone=phone or "—",
         qr_data_uri=qr_data_uri,
     )
 

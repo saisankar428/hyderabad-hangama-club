@@ -29,6 +29,22 @@ class ScanResponse(BaseModel):
     already_scanned: bool = False
 
 
+def _extract_ticket_code(raw: str) -> str:
+    """Parse QR payload into plain ticket code.
+
+    QR codes store 'HHC:TICKET:{code}:{registration_id}'.
+    Direct manual entry is just the code itself (e.g. 'HHC-000001').
+    Both formats are accepted.
+    """
+    raw = raw.strip()
+    if raw.startswith("HHC:TICKET:"):
+        parts = raw.split(":")
+        # "HHC:TICKET:HHC-000001:<uuid>" → parts[2] = "HHC-000001"
+        if len(parts) >= 4:
+            return parts[2]
+    return raw
+
+
 @router.post(
     "/scan",
     response_model=ScanResponse,
@@ -38,13 +54,14 @@ async def scan_ticket(
     payload: ScanRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> ScanResponse:
-    result = await db.execute(select(Ticket).where(Ticket.ticket_code == payload.ticket_code))
+    code = _extract_ticket_code(payload.ticket_code)
+    result = await db.execute(select(Ticket).where(Ticket.ticket_code == code))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Ticket '{payload.ticket_code}' not found",
+            detail=f"Ticket '{code}' not found",
         )
 
     result = await db.execute(select(Registration).where(Registration.id == ticket.registration_id))

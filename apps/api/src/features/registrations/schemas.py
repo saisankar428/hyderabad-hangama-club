@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -42,10 +42,21 @@ class RegistrationCreate(BaseModel):
 
 
 class PaymentOrderResponse(BaseModel):
+    """Razorpay payment order details returned to the frontend."""
     razorpay_order_id: str
     amount: int = Field(..., description="Amount in paise")
     currency: str = Field(default="INR")
     key_id: str = Field(..., description="Razorpay public key ID")
+
+
+class UpiPaymentOrderResponse(BaseModel):
+    """UPI payment details returned to the frontend (temporary, while Razorpay is under review)."""
+    order_ref: str = Field(..., description="Unique order reference stored in DB")
+    amount: int = Field(..., description="Amount in paise")
+    currency: str = Field(default="INR")
+    upi_id: str = Field(..., description="Merchant UPI ID for manual payment")
+    upi_link: str = Field(..., description="UPI deep link (opens payment app on mobile)")
+    upi_qr_base64: str = Field(..., description="Base64-encoded PNG of the UPI QR code")
 
 
 class RegistrationResponse(BaseModel):
@@ -59,13 +70,21 @@ class RegistrationResponse(BaseModel):
     notes: Optional[str] = None
     status: str
     created_at: datetime
-    payment_order: Optional[PaymentOrderResponse] = None
+    payment_order: Optional[Union[PaymentOrderResponse, UpiPaymentOrderResponse]] = None
 
     model_config = {"from_attributes": True}
 
 
 class PaymentVerifyRequest(BaseModel):
+    """Razorpay payment verification payload."""
     registration_id: uuid.UUID
     razorpay_order_id: str
     razorpay_payment_id: str
     razorpay_signature: str
+
+
+class UtrSubmitRequest(BaseModel):
+    """UPI payment confirmation — user submits their transaction reference after paying."""
+    registration_id: uuid.UUID
+    order_ref: str = Field(..., description="Order reference from the registration response")
+    utr_reference: str = Field(..., min_length=6, max_length=100, description="UTR / transaction ID from your UPI app")

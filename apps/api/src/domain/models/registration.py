@@ -69,12 +69,15 @@ class Payment(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     registration_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("registrations.id"), nullable=False)
-    razorpay_order_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+    razorpay_order_id: Mapped[Optional[str]] = mapped_column(String(100), unique=True, nullable=True)
     razorpay_payment_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     razorpay_signature: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     amount: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(10), default="INR")
     status: Mapped[str] = mapped_column(String(50), default=PaymentStatus.INITIATED.value)
+    payment_method: Mapped[str] = mapped_column(String(20), default="razorpay")
+    utr_reference: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    payment_screenshot_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

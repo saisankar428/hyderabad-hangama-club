@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Annotated, Optional
+from typing import Annotated, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel
@@ -37,6 +37,21 @@ class AdminTicketResponse(BaseModel):
     payment_status: str
     amount: int
     currency: str
+
+
+class PendingPaymentResponse(BaseModel):
+    id: uuid.UUID
+    registration_id: uuid.UUID
+    order_ref: Optional[str]
+    amount: int
+    currency: str
+    utr_reference: Optional[str]
+    payment_screenshot_url: Optional[str]
+    attendee_name: str
+    email: str
+    phone: str
+    quantity: int
+    created_at: datetime
 
 
 @router.get("/metrics", response_model=AdminMetricsResponse, summary="Get admin metrics")
@@ -86,3 +101,109 @@ async def search_ticket(
         amount=payment.amount,
         currency=payment.currency,
     )
+
+
+@router.get("/payments/pending", response_model=List[PendingPaymentResponse], summary="List UPI payments awaiting verification")
+async def list_pending_payments(
+    _: Annotated[None, Depends(verify_admin_key)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> List[PendingPaymentResponse]:
+    result = await db.execute(
+        select(Payment, Registration)
+        .join(Registration, Payment.registration_id == Registration.id)
+        .where(Payment.status == "pending_verification")
+        .order_by(Payment.created_at.asc())
+    )
+    rows = result.all()
+
+    return [
+        PendingPaymentResponse(
+            id=payment.id,
+            registration_id=payment.registration_id,
+            order_ref=payment.razorpay_order_id,
+            amount=payment.amount,
+            currency=payment.currency,
+            utr_reference=payment.utr_reference,
+            payment_screenshot_url=payment.payment_screenshot_url,
+            attendee_name=registration.name,
+            email=registration.email,
+            phone=registration.phone,
+            quantity=registration.quantity,
+            created_at=payment.created_at,
+        )
+        for payment, registration in rows
+    ]
+
+
+@router.post("/payments/{payment_id}/reject", summary="Reject UPI payment proof")
+async def reject_payment(
+    payment_id: uuid.UUID,
+    _: Annotated[None, Depends(verify_admin_key)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    result = await db.execute(select(Payment).where(Payment.id == payment_id))
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    if payment.status not in ("pending_verification", "initiated"):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Payment cannot be rejected from status '{payment.status}'",
+        )
+
+    payment.status = "failed"
+
+    result = await db.execute(select(Registration).where(Registration.id == payment.registration_id))
+    registration = result.scalar_one_or_none()
+    if registration:
+        registration.status = "payment_pending"
+
+    await db.commit()
+
+    return {"status": "rejected", "payment_id": str(payment_id)}
+
+
+@router.post("/payments/{payment_id}/confirm", summary="Confirm UPI payment and generate ticket")
+async def confirm_payment(
+    payment_id: uuid.UUID,
+    _: Annotated[None, Depends(verify_admin_key)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
+    result = await db.execute(select(Payment).where(Payment.id == payment_id))
+    payment = result.scalar_one_or_none()
+    if not payment:
+        raise HTTPException(status_code=404, detail="Payment not found")
+
+    result = await db.execute(select(Registration).where(Registration.id == payment.registration_id))
+    registration = result.scalar_one_or_none()
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+
+    # Idempotency: if a ticket already exists for this registration, return it directly
+    existing_ticket = await db.scalar(select(Ticket).where(Ticket.registration_id == registration.id))
+    if existing_ticket:
+        return {
+            "status": "already_confirmed",
+            "ticket_code": existing_ticket.ticket_code,
+            "attendee_name": registration.name,
+            "email": registration.email,
+        }
+
+    if payment.status == "success":
+        raise HTTPException(status_code=409, detail="Payment already confirmed but no ticket found — contact support")
+
+    payment.status = "success"
+    registration.status = "confirmed"
+    await db.commit()
+
+    from src.features.tickets.service import TicketService
+    ticket_service = TicketService(db)
+    ticket = await ticket_service.generate_and_deliver_ticket(registration)
+
+    return {
+        "status": "confirmed",
+        "ticket_code": ticket.ticket_code,
+        "attendee_name": registration.name,
+        "email": registration.email,
+    }

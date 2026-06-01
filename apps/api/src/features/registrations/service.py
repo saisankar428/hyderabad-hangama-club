@@ -3,17 +3,12 @@
 import logging
 from typing import Optional
 
-import razorpay
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.config import settings
-from src.domain.models.registration import Event, Payment, Registration
-from src.features.registrations.schemas import (
-    PaymentOrderResponse,
-    RegistrationCreate,
-    RegistrationResponse,
-)
+from src.domain.models.registration import Event, Registration
+from src.features.payments.providers import get_payment_provider
+from src.features.registrations.schemas import RegistrationCreate, RegistrationResponse
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +16,6 @@ logger = logging.getLogger(__name__)
 class RegistrationService:
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
-        self._razorpay = razorpay.Client(
-            auth=(settings.RAZORPAY_KEY_ID, settings.RAZORPAY_KEY_SECRET.get_secret_value())
-        )
 
     async def create_registration(self, payload: RegistrationCreate) -> RegistrationResponse:
         event = await self._get_event_or_raise(payload.event_id)
@@ -43,32 +35,15 @@ class RegistrationService:
         await self._db.flush()
 
         amount = event.ticket_price * payload.quantity
-        order_data = self._razorpay.order.create(
-            {
-                "amount": amount,
-                "currency": "INR",
-                "receipt": str(registration.id),
-                "notes": {
-                    "registration_id": str(registration.id),
-                    "event_name": event.name,
-                    "attendee_name": payload.name,
-                    "quantity": str(payload.quantity),
-                },
-            }
-        )
+        provider = get_payment_provider()
+        payment_order = await provider.create_order(registration, event, amount, self._db)
 
-        payment = Payment(
-            registration_id=registration.id,
-            razorpay_order_id=order_data["id"],
-            amount=amount,
-            currency="INR",
-            status="initiated",
-        )
-        self._db.add(payment)
         await self._db.commit()
         await self._db.refresh(registration)
 
-        logger.info("Registration created: %s | Order: %s", registration.id, order_data["id"])
+        logger.info(
+            "Registration created: %s | provider: %s", registration.id, provider.mode
+        )
 
         return RegistrationResponse(
             id=registration.id,
@@ -81,16 +56,13 @@ class RegistrationService:
             notes=registration.notes,
             status=registration.status,
             created_at=registration.created_at,
-            payment_order=PaymentOrderResponse(
-                razorpay_order_id=order_data["id"],
-                amount=amount,
-                currency="INR",
-                key_id=settings.RAZORPAY_KEY_ID,
-            ),
+            payment_order=payment_order,
         )
 
     async def get_registration(self, registration_id: str) -> Optional[RegistrationResponse]:
-        result = await self._db.execute(select(Registration).where(Registration.id == registration_id))
+        result = await self._db.execute(
+            select(Registration).where(Registration.id == registration_id)
+        )
         registration = result.scalar_one_or_none()
         if not registration:
             return None
@@ -112,7 +84,7 @@ class RegistrationService:
 
     async def _check_capacity(self, event: Event, quantity: int) -> None:
         result = await self._db.execute(
-            select(func.count()).select_from(Registration).where(
+            select(func.coalesce(func.sum(Registration.quantity), 0)).where(
                 Registration.event_id == event.id,
                 Registration.status.in_(["confirmed", "payment_pending"]),
             )

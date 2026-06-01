@@ -23,11 +23,55 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 1.0  # seconds; doubles each attempt: 1s → 2s → 4s
 
 
+async def send_admin_payment_notification(
+    admin_phone: str,
+    attendee_name: str,
+    attendee_phone: str,
+    amount_rupees: str,
+    utr_reference: str,
+    dashboard_url: str = "",
+) -> None:
+    """
+    Notify admin via WhatsApp when a customer submits payment proof.
+
+    Template params:
+      {{1}} → attendee name
+      {{2}} → attendee mobile
+      {{3}} → amount (₹)
+      {{4}} → transaction ID / UTR
+      {{5}} → dashboard URL (optional)
+    """
+    normalized_phone = _normalize_phone(admin_phone)
+
+    template_params = [attendee_name, attendee_phone, amount_rupees, utr_reference]
+    if dashboard_url:
+        template_params.append(dashboard_url)
+
+    payload: dict = {
+        "apiKey": settings.AISENSY_API_KEY,
+        "campaignName": settings.ADMIN_AISENSY_CAMPAIGN_NAME_ADMIN,
+        "destination": normalized_phone,
+        "userName": "Admin",
+        "templateParams": template_params,
+        "source": "admin-alert",
+        "buttons": [],
+        "carouselCards": [],
+        "location": {},
+        "paramsFallbackValue": {"FirstName": "Admin"},
+    }
+
+    await _post_with_retry(payload, phone=normalized_phone, ticket_code=f"admin-alert-{utr_reference}")
+
+
 async def send_ticket_whatsapp(
     phone: str,
     name: str,
     ticket_code: str,
     qr_media_url: Optional[str] = None,
+    event_name: str = "",
+    event_date: str = "",
+    event_time: str = "",
+    event_venue: str = "",
 ) -> None:
     """
     Send WhatsApp booking confirmation via AiSensy.
@@ -38,18 +82,40 @@ async def send_ticket_whatsapp(
         ticket_code: Unique ticket identifier (e.g. HHC-000042).
         qr_media_url: Publicly accessible HTTPS URL of the QR code image.
                       Omit if no public URL is available — message sends without media.
+        event_name: Name of the event (template {{3}}).
+        event_date: Formatted event date string (template {{4}}).
+        event_time: Formatted event time string (template {{5}}).
+        event_venue: Event venue (template {{6}}).
+
+    AiSensy template param mapping:
+        {{1}} → attendee name
+        {{2}} → ticket code
+        {{3}} → event name
+        {{4}} → event date
+        {{5}} → event time
+        {{6}} → venue
 
     Raises:
         RuntimeError: After all retry attempts are exhausted.
     """
     normalized_phone = _normalize_phone(phone)
 
+    # Build template params — always include all 6 so the template can use any subset
+    template_params = [
+        name,
+        ticket_code,
+        event_name or "Hyderabad Hangama Club Event",
+        event_date or "",
+        event_time or "",
+        event_venue or "",
+    ]
+
     payload: dict = {
         "apiKey": settings.AISENSY_API_KEY,
         "campaignName": settings.AISENSY_CAMPAIGN_NAME,
         "destination": normalized_phone,
         "userName": name,
-        "templateParams": [name, ticket_code],
+        "templateParams": template_params,
         "source": "ticketing-system",
         "buttons": [],
         "carouselCards": [],

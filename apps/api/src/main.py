@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select, text
 
 from src.core.config import settings
 from src.core.database import Base, async_session, engine
@@ -16,6 +19,12 @@ from src.features.registrations.router import router as registrations_router
 from src.features.scanner.router import router as scanner_router
 from src.features.tickets.router import router as tickets_router
 
+logger = logging.getLogger(__name__)
+
+# Ensure the uploads directory exists before mounting static files
+_UPLOADS_DIR = Path("uploads")
+(_UPLOADS_DIR / "screenshots").mkdir(parents=True, exist_ok=True)
+
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +33,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Serve uploaded screenshots at /uploads/...
+app.mount("/uploads", StaticFiles(directory=str(_UPLOADS_DIR)), name="uploads")
 
 app.include_router(health_router)
 app.include_router(events_router)
@@ -35,10 +47,33 @@ app.include_router(scanner_router)
 app.include_router(admin_router)
 
 
+async def _run_migrations() -> None:
+    """Idempotent schema migrations — runs on every startup.
+
+    Safe to run multiple times. ADD COLUMN IF NOT EXISTS is no-op when
+    column already exists; DROP NOT NULL on already-nullable column is also safe.
+    """
+    statements = [
+        "ALTER TABLE payments ALTER COLUMN razorpay_order_id DROP NOT NULL",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) NOT NULL DEFAULT 'razorpay'",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS utr_reference VARCHAR(100)",
+        "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_screenshot_url TEXT",
+    ]
+    try:
+        async with engine.begin() as conn:
+            for stmt in statements:
+                await conn.execute(text(stmt))
+        logger.info("DB migrations applied successfully")
+    except Exception as exc:
+        logger.warning("DB migration step failed (may be harmless if already applied): %s", exc)
+
+
 @app.on_event("startup")
 async def startup_event() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    await _run_migrations()
 
     async with async_session() as session:
         event_name = "Tollywood Jam Night"

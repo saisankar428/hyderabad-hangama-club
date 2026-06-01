@@ -18,66 +18,117 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export default function HomePage() {
   const [event, setEvent] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchEvent = async () => {
-      try {
-        const response = await fetch(`${apiUrl}/events`);
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.detail || "Unable to load event.");
-        }
-        setEvent(data[0] || null);
-      } catch (err) {
-        setError("Unable to load event details.");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEvent();
+    fetch(`${apiUrl}/events`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setEvent(data?.[0] ?? null))
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const ticketPrice = useMemo(() => {
-    if (!event) return "INR 0";
-    return `INR ${(event.ticket_price / 100).toFixed(0)}`;
-  }, [event]);
+  const price = useMemo(
+    () => (event ? `₹${(event.ticket_price / 100).toFixed(0)}` : "₹500"),
+    [event]
+  );
+  const capacity = event?.capacity ?? 200;
 
   return (
-    <main className="page-shell">
-      <section className="hero-section">
-        <div className="hero-copy">
-          <p className="eyebrow">Tollywood Jam Night</p>
-          <h1>Roast & Toast Lounge</h1>
-          <p className="hero-meta">Sunday June 7 · 5 PM</p>
-          <p className="hero-text">
-            Join Hyderabad Hangama Club for an evening of Tollywood music, dance, and live entertainment. Secure your ticket fast.
+    <div style={{ background: "#000", minHeight: "100vh" }}>
+
+      {/* ── HERO ───────────────────────────────────────────── */}
+      <section className="hhc-hero">
+
+        {/* Concert spotlights */}
+        <div className="hhc-light hhc-light-gold"   aria-hidden="true" />
+        <div className="hhc-light hhc-light-purple" aria-hidden="true" />
+        <div className="hhc-light hhc-light-orange" aria-hidden="true" />
+
+        <div className="hhc-hero-inner">
+
+          {/* 1 — Brand */}
+          <p className="hhc-brand">Hyderabad Hangama Club</p>
+
+          {/* 2 — Tagline */}
+          <p className="hhc-tagline">
+            Mana Paata&nbsp;&nbsp;•&nbsp;&nbsp;Mana Vibe&nbsp;&nbsp;•&nbsp;&nbsp;Mana Hangama
           </p>
-          <div className="hero-stats">
-            <span>{ticketPrice}</span>
-            <span>{event?.capacity ?? "200"} seats available</span>
+
+          {/* Gold rule */}
+          <div className="hhc-divider" />
+
+          {/* 3 — Event name */}
+          <h1 className="hhc-event-title">
+            Tollywood<br />Jam Night
+          </h1>
+
+          {/* 4–6 — Venue · Date · Time */}
+          <div className="hhc-meta">
+            <span className="hhc-meta-item">
+              <span className="hhc-meta-icon">📍</span>
+              Roast &amp; Toast Lounge
+            </span>
+            <span className="hhc-meta-sep" aria-hidden="true">·</span>
+            <span className="hhc-meta-item">
+              <span className="hhc-meta-icon">📅</span>
+              Sunday, June 7
+            </span>
+            <span className="hhc-meta-sep" aria-hidden="true">·</span>
+            <span className="hhc-meta-item">
+              <span className="hhc-meta-icon">🕔</span>
+              5 PM Onwards
+            </span>
           </div>
-        </div>
-        <div className="hero-image">
-          <div className="event-banner">Tollywood Jam Night</div>
+
+          {/* Badges */}
+          <div className="hhc-badges">
+            <span className="hhc-badge hhc-badge-price">{price} per ticket</span>
+            <span className="hhc-badge hhc-badge-seats">{capacity} seats</span>
+          </div>
+
+          {/* CTA */}
+          <a href="#register" className="hhc-cta">
+            Book My Ticket
+          </a>
         </div>
       </section>
 
-      <section className="content-section">
-        <div className="content-card">
+      {/* ── ABOUT + REGISTER ───────────────────────────────── */}
+      <section id="register" className="hhc-content">
+
+        <div className="hhc-card">
           <h2>About the event</h2>
           <p>
-            Experience the best of Tollywood in a premium lounge ambience. The event includes live performances, curated cocktails, and a perfect evening with friends.
+            Hyderabad Hangama Club brings you Tollywood Jam Night — an evening of live
+            Tollywood music, energy-filled performances, curated cocktails, and pure
+            hangama with your people. Join us at the iconic Roast &amp; Toast Lounge
+            for a night you&apos;ll talk about for weeks.
+          </p>
+          <p style={{ marginTop: "16px" }}>
+            Limited seats. First come, first served. Secure yours now.
           </p>
         </div>
 
-        <div className="content-card">
+        <div className="hhc-card">
           <h2>Register now</h2>
-          {loading && <p>Loading registration form…</p>}
-          {error && <p className="message-error">{error}</p>}
+
+          {loading && (
+            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.9rem" }}>
+              Loading…
+            </p>
+          )}
+
+          {!loading && !event && (
+            <p style={{ color: "rgba(255,255,255,0.45)", fontSize: "0.9rem", lineHeight: 1.7 }}>
+              Registration details loading shortly.
+              <br />
+              Check back in a moment or refresh the page.
+            </p>
+          )}
+
           {event && <RegistrationForm event={event} />}
         </div>
       </section>
-    </main>
+    </div>
   );
 }

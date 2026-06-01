@@ -10,11 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.config import settings
 from src.core.database import get_db
 
-router = APIRouter(prefix="/health")
+router = APIRouter(tags=["health"])
 
 
-@router.get("/", summary="Basic health check")
-async def health_check() -> dict:
+def _health_payload() -> dict:
     return {
         "status": "healthy",
         "service": settings.APP_NAME,
@@ -24,10 +23,30 @@ async def health_check() -> dict:
     }
 
 
-@router.get("/db", summary="Database connectivity check")
+@router.get("/health", summary="Basic health check")
+async def health_check() -> dict:
+    """Render / load balancer probe — GET /health"""
+    return _health_payload()
+
+
+@router.get("/health/", summary="Basic health check (trailing slash)")
+async def health_check_slash() -> dict:
+    return _health_payload()
+
+
+@router.get("/health/db", summary="Database connectivity check")
 async def database_health(db: Annotated[AsyncSession, Depends(get_db)]) -> dict:
     try:
         await db.execute(text("SELECT 1"))
-        return {"status": "healthy", "database": "connected"}
-    except Exception as e:
-        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "pool": "null" if settings.DB_USE_NULL_POOL else "queued",
+        }
+    except Exception as exc:
+        return {
+            "status": "unhealthy",
+            "database": "disconnected",
+            "error": "Database is temporarily unavailable. Please try again shortly.",
+            "detail": str(exc) if settings.DEBUG else None,
+        }

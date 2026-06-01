@@ -32,6 +32,10 @@ export default function RegisterPage() {
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
   const fetchEvent = useCallback(() => {
+    if (!apiUrl) {
+      setStatus("error");
+      return;
+    }
     setStatus("loading");
     fetch(`${apiUrl}/events`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))

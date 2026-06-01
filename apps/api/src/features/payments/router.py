@@ -4,8 +4,6 @@ import asyncio
 import hashlib
 import hmac
 import logging
-import uuid
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
@@ -16,13 +14,15 @@ from src.core.config import settings
 from src.core.database import get_db
 from src.domain.models.registration import Event, Payment, Registration
 from src.features.registrations.schemas import PaymentVerifyRequest
+from src.infrastructure.storage import (
+    StorageError,
+    StorageNotConfiguredError,
+    upload_payment_screenshot,
+    validate_image_upload,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/payments")
-
-_SCREENSHOTS_DIR = Path("uploads") / "screenshots"
-_ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
-_MAX_SCREENSHOT_BYTES = 5 * 1024 * 1024  # 5 MB
 
 
 # ── Mode guard ────────────────────────────────────────────────────────────────
@@ -49,32 +49,25 @@ def _require_mode(expected: str) -> None:
 # ── Screenshot helper ─────────────────────────────────────────────────────────
 
 async def _save_screenshot(file: UploadFile) -> str:
-    """Validate, save, and return the relative URL path for a payment screenshot."""
-    if file.content_type not in _ALLOWED_IMAGE_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Screenshot must be a JPEG, PNG, WEBP, or GIF image",
-        )
-
+    """Validate, upload to Supabase Storage, and return a public HTTPS URL (or dev path)."""
     data = await file.read()
-    if len(data) > _MAX_SCREENSHOT_BYTES:
+    try:
+        ext = validate_image_upload(file.content_type, len(data))
+        return await upload_payment_screenshot(data, file.content_type or "image/jpeg", ext)
+    except StorageError as exc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Screenshot must be under 5 MB",
-        )
-
-    ext = {
-        "image/jpeg": ".jpg",
-        "image/png": ".png",
-        "image/webp": ".webp",
-        "image/gif": ".gif",
-    }.get(file.content_type, ".jpg")
-
-    _SCREENSHOTS_DIR.mkdir(parents=True, exist_ok=True)
-    filename = f"{uuid.uuid4().hex}{ext}"
-    (_SCREENSHOTS_DIR / filename).write_bytes(data)
-
-    return f"/uploads/screenshots/{filename}"
+            detail=str(exc),
+        ) from exc
+    except StorageNotConfiguredError as exc:
+        logger.error("Storage not configured: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=(
+                "Payment upload is temporarily unavailable. "
+                "Please try again later or contact support."
+            ),
+        ) from exc
 
 
 # ── Admin notification helper ─────────────────────────────────────────────────

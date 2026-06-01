@@ -1,0 +1,45 @@
+# Render Web Service — apps/api (FastAPI)
+# Paste each KEY=VALUE into Render → Service → Environment
+
+APP_ENV=production
+DEBUG=false
+SECRET_KEY=generate-a-random-32-plus-character-secret
+
+# Supabase → Settings → Database → Connection string (Session mode recommended)
+# Use URI format; asyncpg driver is applied automatically
+DATABASE_URL=postgresql://postgres.[PROJECT_REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres
+DATABASE_SSL=true
+DB_POOL_SIZE=5
+DB_MAX_OVERFLOW=10
+# Set true if using transaction pooler on port 6543 (auto-detected if omitted)
+# DB_USE_NULL_POOL=true
+
+# Supabase → Settings → API
+SUPABASE_URL=https://[PROJECT_REF].supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_STORAGE_BUCKET=payment-screenshots
+
+# After first deploy — your Render service URL (no trailing slash)
+API_BASE_URL=https://hyderabad-hangama-api.onrender.com
+CORS_ORIGINS=https://hyderabadhangamaclub.vercel.app
+ADMIN_DASHBOARD_URL=https://hyderabadhangamaclub.vercel.app/admin
+ADMIN_API_KEY=your-strong-admin-secret
+
+PAYMENT_MODE=UPI_MANUAL
+UPI_ID=yourname@upi
+UPI_MERCHANT_NAME=Hyderabad Hangama Club
+
+RESEND_API_KEY=re_xxxxxxxx
+EMAIL_FROM=tickets@yourdomain.com
+EMAIL_FROM_NAME=Hyderabad Hangama Club
+
+AISENSY_API_KEY=your-aisensy-key
+AISENSY_CAMPAIGN_NAME=ticket_confirmation
+ADMIN_WHATSAPP_NUMBER=919876543210
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_AISENSY_CAMPAIGN_NAME_ADMIN=admin_payment_alert
+
+# Optional — Razorpay online payments
+# RAZORPAY_KEY_ID=rzp_live_xxx
+# RAZORPAY_KEY_SECRET=xxx
+# RAZORPAY_WEBHOOK_SECRET=xxx

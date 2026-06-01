@@ -1,0 +1,15 @@
+# Vercel — apps/web (Next.js)
+# Project Settings → Environment Variables → Production + Preview
+# Redeploy after any change (NEXT_PUBLIC_* vars are baked at build time)
+
+# Required — public HTTPS URL of your Render API (no trailing slash)
+NEXT_PUBLIC_API_URL=https://hyderabad-hangama-api.onrender.com
+
+# Required — must match Render ADMIN_API_KEY
+NEXT_PUBLIC_ADMIN_KEY=your-strong-admin-secret
+
+# Required when PAYMENT_MODE=UPI_MANUAL on the API
+NEXT_PUBLIC_UPI_ID=yourname@upi
+
+# Required when PAYMENT_MODE=RAZORPAY on the API
+# NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_live_xxxxxxxx

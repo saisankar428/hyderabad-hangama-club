@@ -21,6 +21,7 @@ class RegistrationStatus(str, Enum):
 
 class PaymentStatus(str, Enum):
     INITIATED = "initiated"
+    PENDING_VERIFICATION = "pending_verification"
     SUCCESS = "success"
     FAILED = "failed"
     REFUNDED = "refunded"

@@ -9,6 +9,7 @@ from sqlalchemy import select, text
 
 from src.core.config import settings
 from src.core.database import Base, async_session, engine
+from src.core.logging_config import configure_logging
 from src.domain.models.registration import Event
 from src.features.admin.router import router as admin_router
 from src.features.events.router import router as events_router
@@ -19,33 +20,28 @@ from src.features.registrations.router import router as registrations_router
 from src.features.scanner.router import router as scanner_router
 from src.features.tickets.router import router as tickets_router
 
+configure_logging()
 logger = logging.getLogger(__name__)
 
-# Ensure the uploads directory exists before mounting static files
-_UPLOADS_DIR = Path("uploads")
-(_UPLOADS_DIR / "screenshots").mkdir(parents=True, exist_ok=True)
-
-def _parse_cors_origins() -> tuple[list[str], bool]:
-    raw = settings.CORS_ORIGINS.strip()
-    if not raw or raw == "*":
-        return ["*"], False
-    origins = [o.strip() for o in raw.split(",") if o.strip()]
-    return origins or ["*"], bool(origins)
-
-
-_cors_origins, _cors_credentials = _parse_cors_origins()
+_cors_origins = settings.cors_origins_list()
+_cors_credentials = _cors_origins != ["*"] and bool(_cors_origins)
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
     allow_credentials=_cors_credentials,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
-# Serve uploaded screenshots at /uploads/...
-app.mount("/uploads", StaticFiles(directory=str(_UPLOADS_DIR)), name="uploads")
+# Local dev fallback for screenshots when Supabase is not configured
+if not settings.is_production() and not settings.supabase_configured():
+    _uploads_dir = Path("uploads")
+    (_uploads_dir / "screenshots").mkdir(parents=True, exist_ok=True)
+    app.mount("/uploads", StaticFiles(directory=str(_uploads_dir)), name="uploads")
+    logger.info("Mounted local /uploads (development only — use Supabase Storage in production)")
 
 app.include_router(health_router)
 app.include_router(events_router)
@@ -58,11 +54,6 @@ app.include_router(admin_router)
 
 
 async def _run_migrations() -> None:
-    """Idempotent schema migrations — runs on every startup.
-
-    Safe to run multiple times. ADD COLUMN IF NOT EXISTS is no-op when
-    column already exists; DROP NOT NULL on already-nullable column is also safe.
-    """
     statements = [
         "ALTER TABLE payments ALTER COLUMN razorpay_order_id DROP NOT NULL",
         "ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) NOT NULL DEFAULT 'razorpay'",
@@ -78,18 +69,36 @@ async def _run_migrations() -> None:
         logger.warning("DB migration step failed (may be harmless if already applied): %s", exc)
 
 
+def _validate_startup_config() -> None:
+    errors = settings.validate_production()
+    for message in errors:
+        logger.error("Configuration error: %s", message)
+
+    if settings.is_production() and errors:
+        raise RuntimeError(
+            "Production configuration is incomplete. "
+            + " ".join(errors)
+        )
+
+    if settings.is_production():
+        if not settings.UPI_ID and settings.PAYMENT_MODE.upper() == "UPI_MANUAL":
+            logger.warning("UPI_ID is empty while PAYMENT_MODE=UPI_MANUAL")
+    else:
+        for message in errors:
+            logger.warning("Production config note (non-fatal in dev): %s", message)
+
+
 @app.on_event("startup")
 async def startup_event() -> None:
-    if settings.APP_ENV == "production":
-        if not settings.API_BASE_URL.strip():
-            logger.warning(
-                "API_BASE_URL is empty — WhatsApp QR image links will not work. "
-                "Set it to your public API URL (e.g. https://api.example.com)."
-            )
-        if _cors_origins == ["*"]:
-            logger.warning(
-                "CORS_ORIGINS is * in production — set it to your Vercel frontend URL(s)."
-            )
+    _validate_startup_config()
+
+    logger.info(
+        "Starting %s | env=%s | db_pool=%s | storage=%s",
+        settings.APP_NAME,
+        settings.APP_ENV,
+        "null" if settings.DB_USE_NULL_POOL else "queued",
+        "supabase" if settings.supabase_configured() else "local-dev",
+    )
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -107,13 +116,18 @@ async def startup_event() -> None:
                 venue="Roast & Toast Lounge",
                 event_date=datetime(2026, 6, 6, 17, 0, tzinfo=timezone(timedelta(hours=5, minutes=30))),
                 capacity=100,
-                ticket_price=29900,  # ₹299
+                ticket_price=29900,
                 is_active=True,
             )
             session.add(event)
             await session.commit()
+            logger.info("Seeded default event: %s", event_name)
 
 
 @app.get("/")
 async def root() -> dict:
-    return {"message": "Hyderabad Hangama Club API is running"}
+    return {
+        "message": f"{settings.APP_NAME} API is running",
+        "health": "/health",
+        "docs": "/docs",
+    }

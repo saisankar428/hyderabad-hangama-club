@@ -23,10 +23,19 @@ const missing = required.filter(({ key }) => !process.env[key]?.trim());
 
 if (missing.length === 0) {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/$/, "");
-  if (isVercel && apiUrl.startsWith("http://localhost")) {
+  const isLocalApi =
+    apiUrl.startsWith("http://localhost") ||
+    apiUrl.startsWith("http://127.0.0.1");
+  if (isVercel && isLocalApi) {
     console.error(
-      "\n[verify-env] NEXT_PUBLIC_API_URL must not be localhost on Vercel.",
-      "\nDeploy the API (Render, Railway, Fly.io, etc.) and set the public HTTPS URL.\n",
+      "\n[verify-env] NEXT_PUBLIC_API_URL must be a public HTTPS API URL on Vercel.",
+      "\nDeploy the API on Render and set NEXT_PUBLIC_API_URL to that URL.\n",
+    );
+    process.exit(1);
+  }
+  if (isVercel && !apiUrl.startsWith("https://")) {
+    console.error(
+      "\n[verify-env] NEXT_PUBLIC_API_URL must use HTTPS on Vercel.\n",
     );
     process.exit(1);
   }

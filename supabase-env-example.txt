@@ -1,0 +1,33 @@
+# Supabase — configure in Supabase Dashboard (not in Vercel)
+#
+# ── 1. PostgreSQL ─────────────────────────────────────────────────────────────
+# Dashboard → Project Settings → Database
+#
+# Recommended for Render (long-running FastAPI):
+#   Connection string → Session mode → URI
+#   Example host: aws-0-ap-south-1.pooler.supabase.com:5432
+#
+# Copy the URI into Render as DATABASE_URL (postgres:// is auto-converted to asyncpg).
+#
+# For Transaction pooler (port 6543), the API auto-enables NullPool.
+#
+# ── 2. Storage bucket ─────────────────────────────────────────────────────────
+# Dashboard → Storage → New bucket
+#
+#   Name: payment-screenshots  (must match SUPABASE_STORAGE_BUCKET on Render)
+#   Public bucket: YES  (required for admin screenshot preview via public URL)
+#
+# Policies (if using RLS on storage.objects):
+#   - Service role: full access (used by API with SUPABASE_SERVICE_ROLE_KEY)
+#   - Do not expose service role key in the frontend
+#
+# ── 3. API keys ───────────────────────────────────────────────────────────────
+# Dashboard → Project Settings → API
+#
+#   Project URL     → SUPABASE_URL on Render
+#   service_role    → SUPABASE_SERVICE_ROLE_KEY on Render (secret — server only)
+#   anon            → not needed for this app (browser talks to FastAPI only)
+#
+# ── 4. Optional SQL ───────────────────────────────────────────────────────────
+# Tables are created automatically by the API on startup (SQLAlchemy create_all).
+# For production hardening, consider exporting schema and managing via migrations later.

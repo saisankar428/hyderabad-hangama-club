@@ -1,19 +1,7 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
-import { RegistrationForm } from "@/features/registration/RegistrationForm";
-
-/* ── Types ───────────────────────────────────────────────────── */
-
-interface EventData {
-  id: string;
-  name: string;
-  description: string | null;
-  venue: string;
-  event_date: string;
-  capacity: number;
-  ticket_price: number;
-}
+import { Fragment, useEffect, useState } from "react";
+import Link from "next/link";
 
 /* ── SVG: Vintage Microphone ─────────────────────────────────── */
 
@@ -102,8 +90,8 @@ function useCountdown(target: Date): TimeLeft {
 
 /* ── Static data ─────────────────────────────────────────────── */
 
-// 7 Jun 2026 17:00 IST = 11:30 UTC
-const EVENT_DATE = new Date("2026-06-07T11:30:00Z");
+// 6 Jun 2026 17:00 IST = 11:30 UTC
+const EVENT_DATE = new Date("2026-06-06T11:30:00Z");
 
 const FEATURES = [
   { icon: "🎤", label: "Sing\nAlong" },
@@ -140,41 +128,23 @@ const FLOAT_NOTES = [
 
 const CD_ITEMS = ["Days", "Hrs", "Mins", "Secs"] as const;
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
-const FALLBACK_EVENT: EventData = {
+const FALLBACK_EVENT = {
   id: "upcoming",
   name: "Tollywood Jam Night",
   description: null,
   venue: "Roast & Toast Lounge",
-  event_date: "2026-06-07T11:30:00Z",
-  capacity: 200,
+  event_date: "2026-06-06T11:30:00Z",
+  capacity: 100,
   ticket_price: 29900,
 };
 
 /* ── Page ────────────────────────────────────────────────────── */
 
 export default function HomePage() {
-  const [event, setEvent] = useState<EventData>(FALLBACK_EVENT);
-  const [eventStatus, setEventStatus] = useState<"loading" | "success" | "error">("loading");
   const countdown = useCountdown(EVENT_DATE);
 
-  const fetchEvent = useCallback(() => {
-    setEventStatus("loading");
-    fetch(`${apiUrl}/events`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => {
-        const first: EventData | undefined = data?.[0];
-        if (first) setEvent(first);
-        setEventStatus("success");
-      })
-      .catch(() => setEventStatus("error"));
-  }, []);
-
-  useEffect(() => { fetchEvent(); }, [fetchEvent]);
-
-  const price    = useMemo(() => `₹${(event.ticket_price / 100).toFixed(0)}`, [event]);
-  const capacity = event.capacity;
+  const price    = `₹${Math.round(FALLBACK_EVENT.ticket_price / 100)}`;
+  const capacity = FALLBACK_EVENT.capacity;
   const pad      = (n: number) => String(n).padStart(2, "0");
 
   const cdValues: Record<typeof CD_ITEMS[number], string> = {
@@ -276,7 +246,7 @@ export default function HomePage() {
 
           {/* Event meta */}
           <div className="event-meta-bar">
-            <div className="meta-chip"><span>📅</span><span>Sunday, June 7, 2026</span></div>
+            <div className="meta-chip"><span>📅</span><span>Saturday, June 6, 2026</span></div>
             <span className="meta-divider" aria-hidden="true">|</span>
             <div className="meta-chip"><span>🕔</span><span>5 PM Onwards</span></div>
             <span className="meta-divider" aria-hidden="true">|</span>
@@ -287,15 +257,14 @@ export default function HomePage() {
           <div className="ticket-badges">
             <span className="tbadge tbadge-price">{price} per ticket</span>
             <span className="tbadge tbadge-seats">{capacity} seats only</span>
-            <span className="tbadge tbadge-early">🎟 Early Bird Available</span>
           </div>
 
           {/* CTA */}
-          <a href="#register" className="book-cta">
+          <Link href="/register" className="book-cta">
             <span>🎤</span>
             <span>Book My Spot</span>
             <span className="cta-arrow">→</span>
-          </a>
+          </Link>
 
           <p className="social-handle">
             Follow us for updates: <strong>@hyderabadhangamaclub</strong>
@@ -341,18 +310,15 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="hhc-card">
-          <h2>Register now</h2>
-          {eventStatus === "loading" && (
-            <p className="event-status-line event-status-loading">Loading event details…</p>
-          )}
-          {eventStatus === "error" && (
-            <p className="event-status-line">
-              Using saved event info &nbsp;·&nbsp;{" "}
-              <button className="event-retry-btn" onClick={fetchEvent}>Retry</button>
-            </p>
-          )}
-          <RegistrationForm event={event} />
+        <div className="hhc-card hhc-register-cta-card">
+          <h2>Book your spot</h2>
+          <p>
+            Only {capacity} seats available. Fill in your details, choose your tickets,
+            and complete payment — all in under 2 minutes.
+          </p>
+          <Link href="/register" className="button" style={{ display: "inline-block", marginTop: 20, textDecoration: "none", textAlign: "center" }}>
+            Register Now →
+          </Link>
         </div>
 
       </section>

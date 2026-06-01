@@ -171,6 +171,8 @@ button, input, select, textarea { font: inherit; }
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: rgba(255,255,255,0.38);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 /* ── Brand row (Mic + Name + Guitar) ── */
@@ -915,7 +917,17 @@ button, input, select, textarea { font: inherit; }
   .cl { filter: blur(60px); }
 
   /* Compact hero padding — preserve top space for badge */
-  .concert-hero-inner { padding: 76px 20px 60px; }
+  .concert-hero-inner { padding: 76px 20px 60px; overflow-x: hidden; }
+
+  /* Reduce aggressive letter-spacing that causes overflow on narrow screens */
+  .hero-eyebrow      { letter-spacing: 0.06em; font-size: 0.68rem; }
+  .concert-brand     { letter-spacing: 0.14em; font-size: 0.85rem; }
+  .concert-brand-sub { letter-spacing: 0.1em; }
+  .countdown-label   { letter-spacing: 0.14em; }
+  .mana-pill         { letter-spacing: 0.08em; }
+
+  /* Brand row — tighter gap so icons + text fit */
+  .brand-row { gap: 10px; }
 
   /* Grand badge smaller */
   .grand-badge {
@@ -986,4 +998,90 @@ button, input, select, textarea { font: inherit; }
   .cd-sep  { font-size: 1.2rem; }
 
   .meta-chip { font-size: 0.74rem; padding: 7px 12px; }
+}
+
+/* ─── Register page ──────────────────────────────────────────── */
+
+.register-page {
+  min-height: 100vh;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.register-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid rgba(212,175,55,0.12);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(6,6,17,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.register-back {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--gold);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+  padding: 6px 0;
+  -webkit-tap-highlight-color: transparent;
+}
+.register-back:active { opacity: 0.65; }
+
+.register-header-brand {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+}
+
+.register-event-strip {
+  text-align: center;
+  padding: 36px 24px 28px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.register-event-title {
+  margin: 0 0 14px;
+  font-size: clamp(1.6rem, 6vw, 2.4rem);
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, var(--gold-bright) 0%, var(--orange) 55%, var(--purple-bright) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.register-event-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 16px;
+  font-size: 0.84rem;
+  color: rgba(255,255,255,0.58);
+}
+.register-event-meta span { display: flex; align-items: center; gap: 5px; }
+
+.register-form-wrap {
+  flex: 1;
+  max-width: 540px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+@media (max-width: 480px) {
+  .register-header { padding: 14px 16px; }
+  .register-header-brand { display: none; }
+  .register-event-strip { padding: 24px 16px 20px; }
+  .register-form-wrap { padding: 20px 16px 48px; }
 }

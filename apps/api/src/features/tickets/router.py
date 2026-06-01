@@ -1,10 +1,12 @@
 """Tickets feature router - retrieve ticket details and QR codes."""
 
+import base64
 import uuid
 from datetime import datetime
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,4 +47,32 @@ async def get_ticket(
       ticket = result.scalar_one_or_none()
       if not ticket:
                 raise HTTPException(status_code=404, detail=f"Ticket '{ticket_code}' not found")
-            return TicketResponse.model_validate(ticket)
+      return TicketResponse.model_validate(ticket)
+
+
+@router.get(
+    "/{ticket_code}/qr",
+    summary="Get QR code image",
+    description="Returns the ticket QR code as a PNG image. Used by AiSensy for WhatsApp media attachment.",
+    response_class=Response,
+    responses={200: {"content": {"image/png": {}}}},
+)
+async def get_ticket_qr(
+    ticket_code: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> Response:
+    result = await db.execute(select(Ticket).where(Ticket.ticket_code == ticket_code))
+    ticket = result.scalar_one_or_none()
+    if not ticket:
+        raise HTTPException(status_code=404, detail=f"Ticket '{ticket_code}' not found")
+    if not ticket.qr_code_url:
+        raise HTTPException(status_code=404, detail="QR code not available for this ticket")
+
+    # qr_code_url is stored as "data:image/png;base64,<data>"
+    prefix = "data:image/png;base64,"
+    if ticket.qr_code_url.startswith(prefix):
+        image_bytes = base64.b64decode(ticket.qr_code_url[len(prefix):])
+    else:
+        raise HTTPException(status_code=500, detail="QR code format not supported")
+
+    return Response(content=image_bytes, media_type="image/png")

@@ -106,3 +106,16 @@ async def scan_ticket(
               event_id=str(registration.event_id),
               message=f"Welcome, {registration.name}! Entry granted.",
     )
+
+
+@router.post(
+    "/checkin",
+    response_model=ScanResponse,
+    summary="Check in a ticket",
+    description="Check in a ticket and return status VALID, USED, or INVALID.",
+)
+async def checkin_ticket(
+    payload: ScanRequest,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> ScanResponse:
+    return await scan_ticket(payload, db)

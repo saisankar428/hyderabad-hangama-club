@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { RegistrationForm } from "@/src/features/registration/RegistrationForm";
+import { RegistrationForm } from "@/features/registration/RegistrationForm";
 
 interface EventData {
   id: string;

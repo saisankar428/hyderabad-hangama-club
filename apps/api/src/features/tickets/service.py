@@ -1,9 +1,6 @@
-"""Ticket Service - QR generation, Email + WhatsApp delivery.
-Core feature of the Hyderabad Hangama Club ticketing flow.
-"""
+"""Ticket Service — QR generation, email and WhatsApp delivery."""
 
 import base64
-import hashlib
 import io
 import logging
 from typing import Optional
@@ -34,12 +31,11 @@ def generate_qr_code_base64(data: str) -> str:
     )
     qr.add_data(data)
     qr.make(fit=True)
-
     img = qr.make_image(fill_color="black", back_color="white")
-    buffer = io.BytesIO()
-    img.save(buffer, format="PNG")
-    buffer.seek(0)
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
 
 def build_ticket_pdf(
@@ -63,16 +59,13 @@ def build_ticket_pdf(
     pdf.multi_cell(0, 8, f"Event: {event.name}")
     pdf.multi_cell(0, 8, f"Venue: {event.venue}")
     pdf.multi_cell(0, 8, f"Date: {event.event_date.strftime('%A, %d %B %Y %I:%M %p')}")
-    pdf.multi_cell(0, 8, f"Quantity: {registration.quantity}")
-    pdf.multi_cell(0, 8, "\nPlease present this ticket at entry. This ticket is valid for one-time entry only.")
+    pdf.multi_cell(0, 8, f"Tickets: {registration.quantity}")
+    pdf.multi_cell(0, 8, "\nPresent this ticket at entry. Valid for one-time entry only.")
 
-    ticket_bytes = pdf.output(dest="S").encode("latin-1")
-    return ticket_bytes
+    return pdf.output(dest="S").encode("latin-1")
 
 
 class TicketService:
-    """Handles ticket generation and multi-channel delivery."""
-
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
 
@@ -116,26 +109,27 @@ class TicketService:
                 quantity=registration.quantity,
             )
             ticket.email_sent = True
-            logger.info(f"Email sent for ticket: {ticket_code}")
+            logger.info("Email sent for ticket: %s", ticket_code)
         except Exception as exc:
-            logger.error(f"Email delivery failed for {ticket_code}: {exc}")
+            logger.error("Email delivery failed for %s: %s", ticket_code, exc)
 
         try:
+            whatsapp_phone = registration.whatsapp or registration.phone
             qr_media_url = (
                 f"{settings.API_BASE_URL.rstrip('/')}/tickets/{ticket_code}/qr"
                 if settings.API_BASE_URL
                 else None
             )
             await send_ticket_whatsapp(
-                phone=registration.phone,
+                phone=whatsapp_phone,
                 name=registration.name,
                 ticket_code=ticket_code,
                 qr_media_url=qr_media_url,
             )
             ticket.whatsapp_sent = True
-            logger.info(f"WhatsApp sent for ticket: {ticket_code}")
+            logger.info("WhatsApp sent for ticket: %s", ticket_code)
         except Exception as exc:
-            logger.error(f"WhatsApp delivery failed for {ticket_code}: {exc}")
+            logger.error("WhatsApp delivery failed for %s: %s", ticket_code, exc)
 
         await self._db.commit()
         await self._db.refresh(ticket)

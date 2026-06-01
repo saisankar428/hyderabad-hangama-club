@@ -1,7 +1,4 @@
-"""Registration Service - Application layer (Use Cases).
-Orchestrates domain logic, payment initiation, and repository calls.
-Follows Single Responsibility and Dependency Inversion principles.
-"""
+"""Registration Service — orchestrates domain logic, payment initiation, and DB writes."""
 
 import logging
 from typing import Optional
@@ -22,8 +19,6 @@ logger = logging.getLogger(__name__)
 
 
 class RegistrationService:
-    """Handles all registration business logic."""
-
     def __init__(self, db: AsyncSession) -> None:
         self._db = db
         self._razorpay = razorpay.Client(
@@ -39,7 +34,9 @@ class RegistrationService:
             name=payload.name,
             email=payload.email,
             phone=payload.phone,
+            whatsapp=payload.whatsapp or payload.phone,
             quantity=payload.quantity,
+            notes=payload.notes,
             status="payment_pending",
         )
         self._db.add(registration)
@@ -71,7 +68,7 @@ class RegistrationService:
         await self._db.commit()
         await self._db.refresh(registration)
 
-        logger.info(f"Registration created: {registration.id} | Order: {order_data['id']}")
+        logger.info("Registration created: %s | Order: %s", registration.id, order_data["id"])
 
         return RegistrationResponse(
             id=registration.id,
@@ -79,7 +76,9 @@ class RegistrationService:
             name=registration.name,
             email=registration.email,
             phone=registration.phone,
+            whatsapp=registration.whatsapp,
             quantity=registration.quantity,
+            notes=registration.notes,
             status=registration.status,
             created_at=registration.created_at,
             payment_order=PaymentOrderResponse(
@@ -98,7 +97,9 @@ class RegistrationService:
         return RegistrationResponse.model_validate(registration)
 
     async def _get_event_or_raise(self, event_id: str) -> Event:
-        result = await self._db.execute(select(Event).where(Event.id == event_id, Event.is_active == True))
+        result = await self._db.execute(
+            select(Event).where(Event.id == event_id, Event.is_active == True)
+        )
         event = result.scalar_one_or_none()
         if not event:
             from fastapi import HTTPException, status

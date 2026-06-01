@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { RegistrationForm } from "@/features/registration/RegistrationForm";
 
 /* ── Types ───────────────────────────────────────────────────── */
@@ -142,23 +142,39 @@ const CD_ITEMS = ["Days", "Hrs", "Mins", "Secs"] as const;
 
 const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+const FALLBACK_EVENT: EventData = {
+  id: "upcoming",
+  name: "Tollywood Jam Night",
+  description: null,
+  venue: "Roast & Toast Lounge",
+  event_date: "2026-06-07T11:30:00Z",
+  capacity: 200,
+  ticket_price: 29900,
+};
+
 /* ── Page ────────────────────────────────────────────────────── */
 
 export default function HomePage() {
-  const [event, setEvent] = useState<EventData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [event, setEvent] = useState<EventData>(FALLBACK_EVENT);
+  const [eventStatus, setEventStatus] = useState<"loading" | "success" | "error">("loading");
   const countdown = useCountdown(EVENT_DATE);
 
-  useEffect(() => {
+  const fetchEvent = useCallback(() => {
+    setEventStatus("loading");
     fetch(`${apiUrl}/events`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => setEvent(data?.[0] ?? null))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        const first: EventData | undefined = data?.[0];
+        if (first) setEvent(first);
+        setEventStatus("success");
+      })
+      .catch(() => setEventStatus("error"));
   }, []);
 
-  const price    = useMemo(() => (event ? `₹${(event.ticket_price / 100).toFixed(0)}` : "₹500"), [event]);
-  const capacity = event?.capacity ?? 200;
+  useEffect(() => { fetchEvent(); }, [fetchEvent]);
+
+  const price    = useMemo(() => `₹${(event.ticket_price / 100).toFixed(0)}`, [event]);
+  const capacity = event.capacity;
   const pad      = (n: number) => String(n).padStart(2, "0");
 
   const cdValues: Record<typeof CD_ITEMS[number], string> = {
@@ -327,16 +343,16 @@ export default function HomePage() {
 
         <div className="hhc-card">
           <h2>Register now</h2>
-          {loading && (
-            <p style={{ color: "rgba(255,255,255,0.38)", fontSize: "0.88rem" }}>Loading…</p>
+          {eventStatus === "loading" && (
+            <p className="event-status-line event-status-loading">Loading event details…</p>
           )}
-          {!loading && !event && (
-            <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.88rem", lineHeight: 1.75 }}>
-              Registration opens shortly.<br />
-              Refresh the page in a moment or check back soon.
+          {eventStatus === "error" && (
+            <p className="event-status-line">
+              Using saved event info &nbsp;·&nbsp;{" "}
+              <button className="event-retry-btn" onClick={fetchEvent}>Retry</button>
             </p>
           )}
-          {event && <RegistrationForm event={event} />}
+          <RegistrationForm event={event} />
         </div>
 
       </section>

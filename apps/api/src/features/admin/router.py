@@ -63,9 +63,9 @@ async def get_metrics(
 
 @router.get("/tickets/search", response_model=AdminTicketResponse, summary="Search ticket by code")
 async def search_ticket(
-    ticket_code: str = Query(..., description="Ticket code to search"),
     _: Annotated[None, Depends(verify_admin_key)],
     db: Annotated[AsyncSession, Depends(get_db)],
+    ticket_code: str = Query(..., description="Ticket code to search"),
 ) -> AdminTicketResponse:
     result = await db.execute(select(Ticket, Registration, Payment).join(Registration, Ticket.registration_id == Registration.id).join(Payment, Payment.registration_id == Registration.id).where(Ticket.ticket_code == ticket_code))
     row = result.first()

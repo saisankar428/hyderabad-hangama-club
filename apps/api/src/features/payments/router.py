@@ -1,10 +1,7 @@
-"""Payments feature router.
-Handles Razorpay payment verification and webhook processing.
-"""
+"""Payments feature router — Razorpay payment verification and webhook processing."""
 
 import hashlib
 import hmac
-import json
 import logging
 from typing import Annotated
 
@@ -14,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
 from src.core.database import get_db
-from src.domain.models.registration import Payment, Registration
+from src.domain.models.registration import Event, Payment, Registration
 from src.features.registrations.schemas import PaymentVerifyRequest
 from src.features.tickets.service import TicketService
 
@@ -51,16 +48,31 @@ async def verify_payment(
 
     result = await db.execute(select(Registration).where(Registration.id == payment.registration_id))
     registration = result.scalar_one_or_none()
-    if registration:
-        registration.status = "confirmed"
+    if not registration:
+        raise HTTPException(status_code=404, detail="Registration not found")
+    registration.status = "confirmed"
+
+    result = await db.execute(select(Event).where(Event.id == registration.event_id))
+    event = result.scalar_one_or_none()
 
     await db.commit()
 
     ticket_service = TicketService(db)
     ticket = await ticket_service.generate_and_deliver_ticket(registration)
 
-    logger.info(f"Payment verified and ticket generated: {ticket.ticket_code}")
-    return {"status": "success", "ticket_code": ticket.ticket_code}
+    logger.info("Payment verified and ticket generated: %s", ticket.ticket_code)
+
+    return {
+        "status": "success",
+        "ticket_code": ticket.ticket_code,
+        "qr_code_url": ticket.qr_code_url,
+        "attendee_name": registration.name,
+        "email": registration.email,
+        "quantity": registration.quantity,
+        "event_name": event.name if event else "",
+        "event_date": event.event_date.strftime("%A, %d %B %Y %I:%M %p IST") if event else "",
+        "event_venue": event.venue if event else "",
+    }
 
 
 @router.post("/webhook", summary="Razorpay webhook handler")
@@ -81,7 +93,7 @@ async def razorpay_webhook(
 
     event_data = await request.json()
     event_type = event_data.get("event")
-    logger.info(f"Razorpay webhook received: {event_type}")
+    logger.info("Razorpay webhook received: %s", event_type)
 
     payment_payload = (
         event_data.get("payload", {}).get("payment", {}).get("entity")
@@ -95,7 +107,7 @@ async def razorpay_webhook(
     result = await db.execute(select(Payment).where(Payment.razorpay_order_id == razorpay_order_id))
     payment = result.scalar_one_or_none()
     if not payment:
-        logger.warning(f"Webhook payment record not found for order: {razorpay_order_id}")
+        logger.warning("Webhook payment record not found for order: %s", razorpay_order_id)
         return {"status": "not_found", "event": event_type}
 
     payment.status = "success"

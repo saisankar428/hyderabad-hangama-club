@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
 from src.core.config import settings
-from src.core.database import Base, engine, async_session
+from src.core.database import Base, async_session, engine
 from src.domain.models.registration import Event
 from src.features.admin.router import router as admin_router
 from src.features.events.router import router as events_router
@@ -51,7 +51,7 @@ async def startup_event() -> None:
                 venue="Roast & Toast Lounge",
                 event_date=datetime(2026, 6, 7, 17, 0, tzinfo=timezone(timedelta(hours=5, minutes=30))),
                 capacity=200,
-                ticket_price=50000,
+                ticket_price=29900,  # ₹299
                 is_active=True,
             )
             session.add(event)

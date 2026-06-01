@@ -49,8 +49,8 @@ async def startup_event() -> None:
                 name=event_name,
                 description="A night of Tollywood music, lights, and live performances at Roast & Toast Lounge.",
                 venue="Roast & Toast Lounge",
-                event_date=datetime(2026, 6, 7, 17, 0, tzinfo=timezone(timedelta(hours=5, minutes=30))),
-                capacity=200,
+                event_date=datetime(2026, 6, 6, 17, 0, tzinfo=timezone(timedelta(hours=5, minutes=30))),
+                capacity=100,
                 ticket_price=29900,  # ₹299
                 is_active=True,
             )

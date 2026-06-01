@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { RegistrationForm } from "@/features/registration/RegistrationForm";
+import { getApiUrl } from "@/lib/env";
 
 interface EventData {
   id: string;
@@ -14,7 +15,7 @@ interface EventData {
   ticket_price: number;
 }
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const apiUrl = getApiUrl();
 
 const FALLBACK_EVENT: EventData = {
   id: "upcoming",

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { getApiUrl, getUpiId } from "@/lib/env";
 
 /* ── Event shape (passed from parent page) ────────────────────── */
 
@@ -82,7 +83,7 @@ interface PendingData {
 
 /* ── Constants ────────────────────────────────────────────────── */
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const apiUrl = getApiUrl();
 
 /** sessionStorage key for persisting the active UPI order across app-switches */
 const SESSION_KEY = "hhc_upi_order";
@@ -274,7 +275,7 @@ function UpiPaymentScreen({
   useEffect(() => {
     if (upiData.upi_qr_base64) return; // server QR present — nothing to do
 
-    const upiId = process.env.NEXT_PUBLIC_UPI_ID;
+    const upiId = getUpiId();
     if (!upiId) return;
 
     const fallbackLink = [

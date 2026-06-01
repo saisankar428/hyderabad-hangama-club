@@ -25,11 +25,21 @@ logger = logging.getLogger(__name__)
 _UPLOADS_DIR = Path("uploads")
 (_UPLOADS_DIR / "screenshots").mkdir(parents=True, exist_ok=True)
 
+def _parse_cors_origins() -> tuple[list[str], bool]:
+    raw = settings.CORS_ORIGINS.strip()
+    if not raw or raw == "*":
+        return ["*"], False
+    origins = [o.strip() for o in raw.split(",") if o.strip()]
+    return origins or ["*"], bool(origins)
+
+
+_cors_origins, _cors_credentials = _parse_cors_origins()
+
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -70,6 +80,17 @@ async def _run_migrations() -> None:
 
 @app.on_event("startup")
 async def startup_event() -> None:
+    if settings.APP_ENV == "production":
+        if not settings.API_BASE_URL.strip():
+            logger.warning(
+                "API_BASE_URL is empty — WhatsApp QR image links will not work. "
+                "Set it to your public API URL (e.g. https://api.example.com)."
+            )
+        if _cors_origins == ["*"]:
+            logger.warning(
+                "CORS_ORIGINS is * in production — set it to your Vercel frontend URL(s)."
+            )
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

@@ -1,82 +1,82 @@
 # Environment Variables - Hyderabad Hangama Club
 
-All variables should be set in `apps/api/.env` and `apps/web/.env.local`.
-Use `.env.example` as template.
+Use `apps/api/.env` and `apps/web/.env.local` locally. Copy from `.env.example` files.
 
-## Application
+**Production:** see [DEPLOYMENT.md](DEPLOYMENT.md) for Vercel + public API setup.
+
+## Application (API)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | APP_NAME | No | Hyderabad Hangama Club | Application name |
-| APP_ENV | No | development | Environment: development/staging/production |
-| DEBUG | No | true | Enable debug mode (set false in production) |
-| SECRET_KEY | YES | - | Min 32-char secret for JWT/security |
+| APP_ENV | No | development | `development` / `staging` / `production` |
+| DEBUG | No | false | Enable debug (set `false` in production) |
+| SECRET_KEY | YES | - | Min 32-char secret |
 
-## Database
-
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| DATABASE_URL | YES | - | PostgreSQL async URL: postgresql+asyncpg://user:pass@host:5432/db |
-| POSTGRES_DB | No | hangama | Database name (for Docker) |
-| POSTGRES_USER | No | hangama | Database user (for Docker) |
-| POSTGRES_PASSWORD | No | - | Database password (for Docker) |
-| DB_POOL_SIZE | No | 10 | SQLAlchemy connection pool size |
-| DB_MAX_OVERFLOW | No | 20 | SQLAlchemy max overflow connections |
-
-## Redis
+## Database (API)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| REDIS_URL | No | redis://localhost:6379/0 | Redis connection URL |
+| DATABASE_URL | YES | - | `postgresql+asyncpg://...` (`postgres://` from Render is auto-converted) |
+| REDIS_URL | No | redis://localhost:6379/0 | Redis URL |
 
-## Razorpay (Payment Gateway)
-
-Get keys from: https://dashboard.razorpay.com/app/keys
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| RAZORPAY_KEY_ID | YES | Public key (starts with rzp_test_ or rzp_live_) |
-| RAZORPAY_KEY_SECRET | YES | Secret key |
-| RAZORPAY_WEBHOOK_SECRET | YES | Webhook signature secret |
-
-Use test keys for development, live keys for production.
-
-## SendGrid (Email)
-
-Get API key from: https://app.sendgrid.com/settings/api_keys
+## CORS & public URLs (API) — required for Vercel / other devices
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| SENDGRID_API_KEY | YES | SendGrid API key (starts with SG.) |
-| EMAIL_FROM | YES | Verified sender email address |
-| EMAIL_FROM_NAME | No | Sender display name |
+| API_BASE_URL | YES (prod) | Public HTTPS API URL, no trailing slash — WhatsApp QR image links |
+| CORS_ORIGINS | YES (prod) | Comma-separated frontend origins, e.g. `https://app.vercel.app` |
+| ADMIN_DASHBOARD_URL | YES (prod) | Full URL to admin page in notifications |
 
-Sender email must be verified in SendGrid dashboard.
-
-## Twilio (WhatsApp)
-
-Get credentials from: https://console.twilio.com
+## Razorpay (API)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| TWILIO_ACCOUNT_SID | YES | Account SID (starts with AC) |
-| TWILIO_AUTH_TOKEN | YES | Auth token |
-| TWILIO_WHATSAPP_FROM | No | WhatsApp sender (default: Twilio sandbox) |
+| RAZORPAY_KEY_ID | If RAZORPAY mode | Public key |
+| RAZORPAY_KEY_SECRET | If RAZORPAY mode | Secret key |
+| RAZORPAY_WEBHOOK_SECRET | If RAZORPAY mode | Webhook signature secret |
 
-For production, use Twilio WhatsApp Business API.
-
-## Frontend (Next.js)
+## Email — Resend (API)
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| NEXT_PUBLIC_API_URL | YES | Backend API URL |
-| NEXT_PUBLIC_RAZORPAY_KEY_ID | YES | Razorpay public key (exposed to browser) |
-| NEXT_PUBLIC_APP_NAME | No | App name for UI |
+| RESEND_API_KEY | YES | Resend API key |
+| EMAIL_FROM | YES | Verified sender |
+| EMAIL_FROM_NAME | No | Display name |
 
-## Security Notes
+## WhatsApp (API)
 
-- Never commit `.env` files to git (already in `.gitignore`)
-- - Rotate `SECRET_KEY` if compromised
-  - - Use different Razorpay keys for test vs production
-    - - Set `DEBUG=false` in production
-      - - Use strong, unique passwords for database
+| Variable | Required | Description |
+|----------|----------|-------------|
+| AISENSY_API_KEY | For AiSensy | Campaign WhatsApp |
+| AISENSY_CAMPAIGN_NAME | No | Default `ticket_confirmation` |
+| TWILIO_* | For Twilio | Alternative provider |
+
+## Payments (API)
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| PAYMENT_MODE | YES | `UPI_MANUAL` or `RAZORPAY` |
+| UPI_ID | If UPI | UPI VPA |
+| UPI_MERCHANT_NAME | No | Shown in UPI intent |
+| ADMIN_API_KEY | YES | Protects `/admin/*` routes |
+| ADMIN_WHATSAPP_NUMBER | No | Payment alert WhatsApp |
+| ADMIN_EMAIL | No | Payment alert email |
+
+## Frontend (Vercel / Next.js)
+
+Set in **Vercel → Environment Variables** (must redeploy after changes).
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| NEXT_PUBLIC_API_URL | **YES** | Public HTTPS backend URL (not localhost on Vercel) |
+| NEXT_PUBLIC_ADMIN_KEY | YES | Must match API `ADMIN_API_KEY` |
+| NEXT_PUBLIC_UPI_ID | If UPI | Client QR fallback; match API `UPI_ID` |
+| NEXT_PUBLIC_RAZORPAY_KEY_ID | If Razorpay | Public Razorpay key |
+
+## Security
+
+- Never commit `.env` files
+- Use different keys for test vs live
+- Set `DEBUG=false` and strong `SECRET_KEY` in production
+- Restrict `CORS_ORIGINS` to your real frontend domains

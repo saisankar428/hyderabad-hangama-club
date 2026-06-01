@@ -90,7 +90,8 @@
 >                                 10. ## Documentation
 >                                
 >                                 11. - [Setup Guide](docs/SETUP.md)
->                                     - - [Architecture](docs/ARCHITECTURE.md)
+>                                     - - [Deployment (Vercel + public API)](docs/DEPLOYMENT.md)
+>                                       - - [Architecture](docs/ARCHITECTURE.md)
 >                                       - - [API Reference](docs/API.md)
 >                                         - - [Environment Variables](docs/ENV.md)
 >                                          

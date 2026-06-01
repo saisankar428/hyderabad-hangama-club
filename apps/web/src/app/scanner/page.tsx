@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getApiUrl } from "@/lib/env";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const apiUrl = getApiUrl();
 
 type ScanStatus = "idle" | "scanning" | "valid" | "used" | "invalid";
 

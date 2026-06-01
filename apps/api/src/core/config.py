@@ -1,4 +1,4 @@
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -28,6 +28,12 @@ class Settings(BaseSettings):
 
     API_BASE_URL: str = ""
 
+    # Comma-separated browser origins (your Vercel URL). Use * only for local dev.
+    CORS_ORIGINS: str = Field(
+        default="http://localhost:3000,http://127.0.0.1:3000",
+        description="Allowed CORS origins, comma-separated",
+    )
+
     # Payment mode: "RAZORPAY" (online checkout) or "UPI_MANUAL" (QR + admin approval)
     PAYMENT_MODE: str = Field(default="UPI_MANUAL")
     UPI_ID: str = Field(default="")
@@ -39,6 +45,17 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str = Field(default="", description="Admin email address for payment notification emails")
     ADMIN_AISENSY_CAMPAIGN_NAME_ADMIN: str = Field(default="admin_payment_alert", description="AiSensy campaign for admin payment notifications")
     ADMIN_DASHBOARD_URL: str = Field(default="", description="Admin dashboard URL included in notifications")
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        """Render/Railway often provide postgres:// — SQLAlchemy async needs asyncpg."""
+        if isinstance(value, str):
+            if value.startswith("postgres://"):
+                return value.replace("postgres://", "postgresql+asyncpg://", 1)
+            if value.startswith("postgresql://") and "+asyncpg" not in value:
+                return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
 
     model_config = {
         "env_file": ".env",

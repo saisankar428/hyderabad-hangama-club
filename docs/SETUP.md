@@ -78,10 +78,11 @@
 
               ## Production Deployment
 
-              1. Set `APP_ENV=production` in environment
-              2. 2. Use strong `SECRET_KEY` (32+ chars)
-                 3. 3. Configure real Razorpay live keys
-                    4. 4. Set up SendGrid verified sender
-                       5. 5. Enable Twilio WhatsApp business
-                         
-                          6. See [ENV.md](ENV.md) for complete environment variable documentation.
+              Use **[DEPLOYMENT.md](DEPLOYMENT.md)** for the full checklist (Vercel frontend + public API URL, CORS, PostgreSQL, etc.).
+
+              Quick summary:
+
+              1. Deploy API with PostgreSQL (Render/Railway/etc.)
+              2. Set `API_BASE_URL`, `CORS_ORIGINS`, `ADMIN_DASHBOARD_URL` on the API
+              3. Deploy web to Vercel with `NEXT_PUBLIC_API_URL` pointing at the API
+              4. See [ENV.md](ENV.md) for all variables

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { apiAssetUrl, getApiUrl } from "@/lib/env";
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const apiUrl = getApiUrl();
 const POLL_MS = 30_000;
 
 interface PendingPayment {
@@ -33,8 +34,7 @@ interface Toast {
 }
 
 function screenshotSrc(path: string | null): string | null {
-  if (!path) return null;
-  return path.startsWith("http") ? path : `${apiUrl}${path}`;
+  return apiAssetUrl(path);
 }
 
 function ToastStack({ toasts }: { toasts: Toast[] }) {
